@@ -1,0 +1,1 @@
+WrongTypeError = "Request File Type is Wrong"
