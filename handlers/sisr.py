@@ -16,10 +16,15 @@ class SISRHandlerImpl(AbstractSISRHandler):
     async def upscale_image(self, file: UploadFile) -> StreamingResponse:
         if file.content_type not in ["image/png","image/jpeg","image/bmp"]:
             raise HTTPException(status_code=400)
-        byte = BytesIO(await file.read())
-
-        data = self.sisr_service.upscale_image(byte)
-        return StreamingResponse(content=data,media_type=file.content_type)
+        try:
+            byte = BytesIO(await file.read())
+            data = self.sisr_service.upscale_image(byte)
+            return StreamingResponse(content=data,media_type=file.content_type)
+        except Exception:
+            raise HTTPException(status_code=500, detail="Internal Server Error")
+        except ValueError as ver:
+            raise HTTPException(status_code=400, detail=repr(ver))
+        
     
 def create_SISR_handler(service: AbstractSISRService) -> AbstractSISRHandler:
     return SISRHandlerImpl(service)
