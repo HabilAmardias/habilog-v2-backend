@@ -14,18 +14,18 @@ class AbstractSISRUtil(ABC):
     def load_model(self) -> Generator:
         pass
     @abstractmethod
-    def preprocess_image(self, uploaded_file) -> torch.Tensor:
+    def preprocess_image(self, uploaded_file: BytesIO) -> torch.Tensor:
         pass
 
 class SISRUtilImpl(AbstractSISRUtil):
-    def load_model(self):
+    def load_model(self) -> Generator:
         generator = Generator(dim=64)
         generator.load_state_dict(
-            torch.load('../models/Generator.pth',map_location='cpu',weights_only=True)
+            torch.load('models/Generator.pth',map_location='cpu',weights_only=True)
         )
         return generator
 
-    def preprocess_image(self, uploaded_file):
+    def preprocess_image(self, uploaded_file: BytesIO) -> torch.Tensor:
         image = Image.open(uploaded_file).convert('RGB')
         transforms = v2.Compose([
             v2.ToImage(),
@@ -35,7 +35,7 @@ class SISRUtilImpl(AbstractSISRUtil):
         tensor_image:torch.Tensor = transforms(image).unsqueeze(0)
         return tensor_image
 
-    def upscale_image_with_generator(self, tensor: torch.Tensor, generator: Generator):
+    def upscale_image_with_generator(self, tensor: torch.Tensor, generator: Generator) -> BytesIO:
         generator.eval()
         with torch.no_grad():
             pred: torch.Tensor = generator(tensor)
