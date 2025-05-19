@@ -1,1 +1,3 @@
-WrongTypeError = "Request File Type is Wrong"
+class LargeImageResolutionError(Exception):
+    def __init__(self, *args):
+        super().__init__(*args)

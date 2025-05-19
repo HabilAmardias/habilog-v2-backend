@@ -5,6 +5,7 @@ from torchvision.transforms import v2
 import numpy as np
 from io import BytesIO
 from abc import ABC, abstractmethod
+from errors.main import LargeImageResolutionError
 
 class AbstractSISRUtil(ABC):
     @abstractmethod
@@ -28,7 +29,7 @@ class SISRUtilImpl(AbstractSISRUtil):
     def preprocess_image(self, uploaded_file: BytesIO) -> torch.Tensor:
         image = Image.open(uploaded_file).convert('RGB')
         if image.height * image.width > 300*300:
-            raise ValueError("Image resolution is too large")
+            raise LargeImageResolutionError("Image resolution is too large")
         
         transforms = v2.Compose([
             v2.ToImage(),
