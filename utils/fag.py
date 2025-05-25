@@ -1,11 +1,11 @@
 import torch
 from abc import ABC, abstractmethod
 from io import BytesIO
-from sklearn.linear_model import LogisticRegression
 from PIL import Image
-import pickle
+import numpy as np
 from torchvision.models import mobilenet_v3_large
 from torchvision.transforms import v2
+from onnxruntime import InferenceSession
 
 class AbstractFAGUtil(ABC):
     @abstractmethod
@@ -15,16 +15,13 @@ class AbstractFAGUtil(ABC):
     def get_features_extractor(self) -> torch.nn.Sequential:
         pass
     @abstractmethod
-    def get_face_detector(self) -> LogisticRegression:
-        pass
-    @abstractmethod
     def get_age_classifier(self)-> torch.nn.Sequential:
         pass
     @abstractmethod
     def extract_features(self, feature_extractor: torch.nn.Sequential, tensor: torch.Tensor) -> torch.Tensor:
         pass
     @abstractmethod
-    def check_if_face_exist(self, features: torch.Tensor, model: LogisticRegression) -> bool:
+    def check_if_face_exist(self, features: torch.Tensor) -> bool:
         pass
     @abstractmethod
     def classify_age(self, features: torch.Tensor, classifier: torch.nn.Sequential) -> tuple[float, str]:
@@ -38,10 +35,14 @@ class FAGUtilImpl(AbstractFAGUtil):
             pred: torch.Tensor = feature_extractor(tensor)
         return pred
     
-    def check_if_face_exist(self, features, model):
-        probs = model.predict(features.cpu().numpy())
-        print(probs.item())
-        return probs.item() >= 0.5
+    def check_if_face_exist(self, features):
+        f = open("models/classifier.onnx", "rb")
+        onx = f.read()
+        sess = InferenceSession(onx, providers=["CPUExecutionProvider"])
+        pred:np.ndarray = sess.run(None, {"X": features.cpu().numpy().reshape((1,960))})[0]
+        probs:float = pred.item()
+        f.close()
+        return probs > 0.5
     
     def classify_age(self, features, classifier):
         age_map = {
@@ -52,7 +53,8 @@ class FAGUtilImpl(AbstractFAGUtil):
         }
         classifier.eval()
         with torch.no_grad():
-            age_probs: torch.Tensor = classifier(features)
+            age_probs: torch.Tensor = classifier(torch.squeeze(features).unsqueeze(0))
+            age_probs = torch.nn.functional.softmax(age_probs, dim=1).squeeze()
 
         wanted_index = age_probs.argmax().item()
         most_probable_age_range = age_map[wanted_index]
@@ -86,11 +88,7 @@ class FAGUtilImpl(AbstractFAGUtil):
         feature_extractor.add_module('avgpool',model.avgpool)
 
         return feature_extractor
-    def get_face_detector(self):
-        f = open('models/classifier.pkl','rb')
-        clf:LogisticRegression = pickle.load(f)
-        f.close()
-        return clf
+
     def get_age_classifier(self):
         model = mobilenet_v3_large()
         model.classifier[3] = torch.nn.Linear(1280, 4)
